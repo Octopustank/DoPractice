@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+
+{% block title %}管理员登录 - 刷题系统{% endblock %}
+
+{% block content %}
+<div class="login-container">
+    <div class="login-card">
+        <h1>🔐 管理员登录</h1>
+        <p class="subtitle">请输入管理员密码</p>
+        
+        <form method="POST" action="{{ url_for('admin_login') }}">
+            <div class="form-group">
+                <input type="password" name="password" placeholder="请输入管理员密码" required autofocus>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block">登录</button>
+        </form>
+        
+        <div class="login-footer">
+            <a href="{{ url_for('login') }}">返回用户登录</a>
+        </div>
+        
+        <div class="hint-text">
+            <small>默认密码: admin123</small>
+        </div>
+    </div>
+</div>
+{% endblock %}

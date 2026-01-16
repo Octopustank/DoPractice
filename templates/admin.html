@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}管理面板 - 刷题系统{% endblock %}
+
+{% block content %}
+<div class="admin-page">
+    <header class="page-header">
+        <h1>🔧 管理面板</h1>
+        <div class="header-actions">
+            <a href="{{ url_for('login') }}" class="btn btn-outline">用户入口</a>
+            <a href="{{ url_for('admin_logout') }}" class="btn btn-outline">退出管理</a>
+        </div>
+    </header>
+    
+    <div class="admin-grid">
+        <!-- 口令管理 -->
+        <section class="admin-section">
+            <h2>📝 口令管理</h2>
+            <p class="section-desc">管理允许登录的用户口令</p>
+            
+            <form method="POST" action="{{ url_for('add_token') }}" class="inline-form">
+                <input type="text" name="token" placeholder="新口令" required>
+                <button type="submit" class="btn btn-primary">添加口令</button>
+            </form>
+            
+            <div class="token-list">
+                <h3>当前口令列表</h3>
+                {% if tokens %}
+                <ul class="list">
+                    {% for token in tokens %}
+                    <li class="list-item">
+                        <span class="token-value">{{ token }}</span>
+                        <form method="POST" action="{{ url_for('remove_token') }}" class="inline" onsubmit="return confirm('确定删除此口令？')">
+                            <input type="hidden" name="token" value="{{ token }}">
+                            <button type="submit" class="btn btn-danger btn-small">删除</button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="empty-text">暂无口令</p>
+                {% endif %}
+            </div>
+        </section>
+        
+        <!-- 修改密码 -->
+        <section class="admin-section">
+            <h2>🔑 修改管理员密码</h2>
+            <form method="POST" action="{{ url_for('change_password') }}" class="form-vertical">
+                <div class="form-group">
+                    <input type="password" name="new_password" placeholder="新密码" required>
+                </div>
+                <button type="submit" class="btn btn-primary">修改密码</button>
+            </form>
+        </section>
+        
+        <!-- 用户统计 -->
+        <section class="admin-section full-width">
+            <h2>📊 用户练习统计</h2>
+            {% if users_stats %}
+            <div class="table-responsive">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>用户数据文件</th>
+                            <th>已答题数</th>
+                            <th>正确题数</th>
+                            <th>正确率</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for user in users_stats %}
+                        <tr>
+                            <td>{{ user.file }}</td>
+                            <td>{{ user.total_answered }}</td>
+                            <td>{{ user.total_correct }}</td>
+                            <td>
+                                {% if user.total_answered > 0 %}
+                                    {{ (user.total_correct / user.total_answered * 100)|round(1) }}%
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <p class="empty-text">暂无用户数据</p>
+            {% endif %}
+        </section>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+
+{% block title %}选择项目 - 刷题系统{% endblock %}
+
+{% block content %}
+<div class="projects-page">
+    <header class="page-header">
+        <h1>📚 选择练习项目</h1>
+        <a href="{{ url_for('logout') }}" class="btn btn-outline">退出</a>
+    </header>
+    
+    <div class="projects-grid">
+        {% for project in projects %}
+        <div class="project-card">
+            <h3 class="project-title">{{ project.name }}</h3>
+            <div class="project-stats">
+                <span class="stat">共 <strong>{{ project.total }}</strong> 题</span>
+                <span class="stat">已答 <strong>{{ project.answered }}</strong> 题</span>
+                <span class="stat">正确 <strong>{{ project.correct }}</strong> 题</span>
+            </div>
+            
+            {% if project.total > 0 %}
+            <div class="progress-bar">
+                <div class="progress-fill" style="width: {{ (project.answered / project.total * 100)|round(1) }}%"></div>
+            </div>
+            <span class="progress-text">{{ (project.answered / project.total * 100)|round(1) }}%</span>
+            {% endif %}
+            
+            <div class="project-actions">
+                <a href="{{ url_for('practice', project_name=project.name, mode='memorize') }}" class="btn btn-secondary">
+                    📖 背题模式
+                </a>
+                <a href="{{ url_for('practice', project_name=project.name, mode='sequential') }}" class="btn btn-primary">
+                    📝 顺序练习
+                </a>
+                <a href="{{ url_for('practice', project_name=project.name, mode='random') }}" class="btn btn-accent">
+                    🎲 随机练习
+                </a>
+            </div>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <p>暂无可用的练习项目</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

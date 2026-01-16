@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+
+{% block title %}{{ project_name }} - {% if mode == 'memorize' %}背题模式{% elif mode == 'sequential' %}顺序练习{% else %}随机练习{% endif %}{% endblock %}
+
+{% block extra_head %}
+<script>
+    // 传递数据到 JavaScript
+    window.practiceData = {
+        projectName: {{ project_name | tojson }},
+        mode: {{ mode | tojson }},
+        questions: {{ questions | tojson }},
+        userAnswers: {{ user_answers | tojson }},
+        total: {{ total }}
+    };
+</script>
+{% endblock %}
+
+{% block content %}
+<div class="practice-page">
+    <!-- 顶部导航 -->
+    <header class="practice-header">
+        <a href="{{ url_for('projects') }}" class="btn btn-icon" title="返回">←</a>
+        <div class="header-info">
+            <h1 class="header-title">
+                {% if mode == 'memorize' %}📖 背题模式
+                {% elif mode == 'sequential' %}📝 顺序练习
+                {% else %}🎲 随机练习{% endif %}
+            </h1>
+            <span class="header-subtitle">{{ project_name }}</span>
+        </div>
+        <button id="toggleCard" class="btn btn-icon" title="答题卡">📋</button>
+    </header>
+    
+    <!-- 主要内容区域 -->
+    <div class="practice-main">
+        <!-- 题目区域 -->
+        <div class="question-area">
+            <div class="question-header">
+                <span class="question-number">第 <span id="currentNum">1</span>/<span id="totalNum">{{ total }}</span> 题</span>
+                <span id="questionType" class="question-type"></span>
+            </div>
+            
+            <div class="question-content">
+                <div id="questionText" class="question-text"></div>
+                
+                <div id="optionsContainer" class="options-container"></div>
+            </div>
+            
+            <!-- 答案反馈区 -->
+            <div id="feedbackArea" class="feedback-area hidden">
+                <div id="feedbackContent"></div>
+            </div>
+            
+            <!-- 操作按钮 -->
+            <div class="question-actions">
+                <button id="prevBtn" class="btn btn-secondary">上一题</button>
+                <button id="submitBtn" class="btn btn-primary">提交答案</button>
+                <button id="nextBtn" class="btn btn-secondary">下一题</button>
+            </div>
+            
+            <!-- 重置进度按钮 -->
+            <div class="reset-area">
+                <button id="resetBtn" class="btn btn-danger btn-small">重置本项目进度</button>
+            </div>
+        </div>
+        
+        <!-- 答题卡侧边栏 -->
+        <aside id="answerCard" class="answer-card">
+            <div class="card-header">
+                <h3>答题卡</h3>
+                <button id="closeCard" class="btn btn-icon btn-small">×</button>
+            </div>
+            <div class="card-stats">
+                <span>总计: <strong id="statTotal">{{ total }}</strong></span>
+                <span>已答: <strong id="statAnswered">0</strong></span>
+                <span>正确: <strong id="statCorrect">0</strong></span>
+            </div>
+            <div class="card-legend">
+                <span class="legend-item"><span class="legend-color unanswered"></span>未答</span>
+                <span class="legend-item"><span class="legend-color correct"></span>正确</span>
+                <span class="legend-item"><span class="legend-color wrong"></span>错误</span>
+                <span class="legend-item"><span class="legend-color current"></span>当前</span>
+            </div>
+            <div id="cardGrid" class="card-grid"></div>
+        </aside>
+    </div>
+</div>
+
+<!-- 答题卡遮罩层（移动端） -->
+<div id="cardOverlay" class="card-overlay"></div>
+{% endblock %}
+
+{% block extra_scripts %}
+<script src="{{ url_for('static', filename='practice.js') }}"></script>
+{% endblock %}
