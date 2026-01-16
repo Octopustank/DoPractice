@@ -1,0 +1,7 @@
+usr/*
+log.txt
+*.log
+temp/
+*.tmp
+__pycache__/
+venv/
