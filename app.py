@@ -44,6 +44,89 @@ def save_admin_config(config):
     with open(ADMIN_CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
+def get_announcements():
+    """获取所有公告"""
+    config = get_admin_config()
+    return config.get('announcements', [])
+
+def add_announcement(title, content):
+    """添加新公告
+    返回：(success, message, announcement_hash)
+    """
+    config = get_admin_config()
+    
+    if 'announcements' not in config:
+        config['announcements'] = []
+    
+    # 生成公告哈希（使用时间戳+标题+内容的MD5前10位）
+    timestamp = datetime.now().isoformat()
+    hash_source = f"{timestamp}{title}{content}".encode('utf-8')
+    announcement_hash = hashlib.md5(hash_source).hexdigest()[:10]
+    
+    # 检查哈希是否已存在（防止极低概率的碰撞）
+    existing_hashes = {ann['hash'] for ann in config['announcements']}
+    attempt = 0
+    while announcement_hash in existing_hashes and attempt < 10:
+        # 如果碰撞，添加随机因子重新生成
+        attempt += 1
+        hash_source = f"{timestamp}{title}{content}{attempt}".encode('utf-8')
+        announcement_hash = hashlib.md5(hash_source).hexdigest()[:10]
+    
+    if announcement_hash in existing_hashes:
+        return False, "公告哈希生成失败", None
+    
+    # 创建公告
+    announcement = {
+        'hash': announcement_hash,
+        'title': title,
+        'content': content,
+        'timestamp': timestamp
+    }
+    
+    # 添加到列表开头（最新的在前面）
+    config['announcements'].insert(0, announcement)
+    save_admin_config(config)
+    
+    return True, "公告发布成功", announcement_hash
+
+def delete_announcement(announcement_hash):
+    """删除公告"""
+    config = get_admin_config()
+    
+    if 'announcements' not in config:
+        return False, "没有公告"
+    
+    announcements = config['announcements']
+    original_len = len(announcements)
+    config['announcements'] = [ann for ann in announcements if ann['hash'] != announcement_hash]
+    
+    if len(config['announcements']) < original_len:
+        save_admin_config(config)
+        return True, "公告已删除"
+    
+    return False, "公告不存在"
+
+def get_unread_announcements(token):
+    """获取用户未读的公告"""
+    user_data = get_user_data(token)
+    read_list = user_data.get('read_announcements', [])
+    
+    all_announcements = get_announcements()
+    unread = [ann for ann in all_announcements if ann['hash'] not in read_list]
+    
+    return unread
+
+def mark_announcement_read(token, announcement_hash):
+    """标记公告为已读"""
+    user_data = get_user_data(token)
+    
+    if 'read_announcements' not in user_data:
+        user_data['read_announcements'] = []
+    
+    if announcement_hash not in user_data['read_announcements']:
+        user_data['read_announcements'].append(announcement_hash)
+        save_user_data(token, user_data)
+
 def get_user_data_file(token):
     """获取用户数据文件路径"""
     token_hash = hashlib.md5(token.encode()).hexdigest()[:16]
@@ -272,6 +355,19 @@ def projects():
     project_structure = get_available_projects()
     user_data = get_user_data(session['token'])
     
+    # 清理已删除公告的阅读记录
+    if 'read_announcements' in user_data and user_data['read_announcements']:
+        # 获取所有存在的公告哈希
+        existing_hashes = {ann['hash'] for ann in get_announcements()}
+        
+        # 过滤掉不存在的公告哈希
+        original_read_list = user_data['read_announcements']
+        user_data['read_announcements'] = [h for h in user_data['read_announcements'] if h in existing_hashes]
+        
+        # 如果有删除，保存更新
+        if len(user_data['read_announcements']) < len(original_read_list):
+            save_user_data(session['token'], user_data)
+    
     # 计算每个项目的进度
     def add_progress(project):
         project_id = project['id']
@@ -419,6 +515,42 @@ def get_random_unanswered():
     random_index = random.choice(unanswered)
     return jsonify({'success': True, 'index': random_index, 'all_answered': False})
 
+# ==================== 公告相关路由 ====================
+
+@app.route('/api/get_unread_announcements', methods=['GET'])
+@login_required
+def api_get_unread_announcements():
+    """获取未读公告"""
+    unread = get_unread_announcements(session['token'])
+    return jsonify({'success': True, 'announcements': unread})
+
+@app.route('/api/get_all_announcements', methods=['GET'])
+@login_required
+def api_get_all_announcements():
+    """获取所有公告"""
+    all_announcements = get_announcements()
+    user_data = get_user_data(session['token'])
+    read_list = user_data.get('read_announcements', [])
+    
+    # 为每个公告添加已读标记
+    for ann in all_announcements:
+        ann['is_read'] = ann['hash'] in read_list
+    
+    return jsonify({'success': True, 'announcements': all_announcements})
+
+@app.route('/api/mark_announcement_read', methods=['POST'])
+@login_required
+def api_mark_announcement_read():
+    """标记公告为已读"""
+    data = request.get_json()
+    announcement_hash = data.get('hash')
+    
+    if not announcement_hash:
+        return jsonify({'success': False, 'message': '参数不完整'})
+    
+    mark_announcement_read(session['token'], announcement_hash)
+    return jsonify({'success': True})
+
 # ==================== 管理员路由 ====================
 
 @app.route('/admin/login', methods=['GET', 'POST'])
@@ -458,7 +590,12 @@ def admin_panel():
             
             total_answered = 0
             total_correct = 0
-            for project_data in user_data.values():
+            # 遍历用户数据，只处理字典类型的项目数据
+            for key, project_data in user_data.items():
+                # 跳过非项目数据（如read_announcements等）
+                if not isinstance(project_data, dict) or 'answers' not in project_data:
+                    continue
+                
                 answers = project_data.get('answers', {})
                 total_answered += len(answers)
                 total_correct += sum(1 for v in answers.values() if v.get('correct'))
@@ -471,7 +608,8 @@ def admin_panel():
     
     return render_template('admin.html',
                          tokens=config['allowed_tokens'],
-                         users_stats=users_stats)
+                         users_stats=users_stats,
+                         announcements=get_announcements())
 
 @app.route('/admin/add_token', methods=['POST'])
 @admin_required
@@ -514,6 +652,36 @@ def change_password():
     else:
         flash('密码不能为空', 'error')
     return redirect(url_for('admin_panel'))
+@app.route('/admin/add_announcement', methods=['POST'])
+@admin_required
+def admin_add_announcement():
+    """发布新公告"""
+    title = request.form.get('title', '').strip()
+    content = request.form.get('content', '').strip()
+    
+    if not title or not content:
+        flash('标题和内容不能为空', 'error')
+    else:
+        success, message, _ = add_announcement(title, content)
+        if success:
+            flash(message, 'success')
+        else:
+            flash(message, 'error')
+    
+    return redirect(url_for('admin_panel'))
+
+@app.route('/admin/delete_announcement', methods=['POST'])
+@admin_required
+def admin_delete_announcement():
+    """删除公告"""
+    announcement_hash = request.form.get('hash', '').strip()
+    
+    if announcement_hash:
+        success, message = delete_announcement(announcement_hash)
+        flash(message, 'success' if success else 'error')
+    
+    return redirect(url_for('admin_panel'))
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

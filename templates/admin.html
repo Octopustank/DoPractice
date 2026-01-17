@@ -54,6 +54,48 @@
             </form>
         </section>
         
+        <!-- 公告管理 -->
+        <section class="admin-section full-width">
+            <h2>📢 公告管理</h2>
+            <p class="section-desc">发布和管理系统公告</p>
+            
+            <form method="POST" action="{{ url_for('admin_add_announcement') }}" class="announcement-form">
+                <div class="form-group">
+                    <input type="text" name="title" placeholder="公告标题" required maxlength="100">
+                </div>
+                <div class="form-group">
+                    <textarea name="content" placeholder="公告内容" required rows="4" maxlength="1000"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">发布公告</button>
+            </form>
+            
+            <div class="announcements-list">
+                <h3>已发布的公告 ({{ announcements|length }})</h3>
+                {% if announcements %}
+                <div class="announcements-container">
+                    {% for ann in announcements %}
+                    <div class="announcement-item">
+                        <div class="announcement-header">
+                            <h4 class="announcement-title">{{ ann.title }}</h4>
+                            <span class="announcement-hash">#{{ ann.hash }}</span>
+                        </div>
+                        <p class="announcement-content">{{ ann.content }}</p>
+                        <div class="announcement-footer">
+                            <span class="announcement-time">{{ ann.timestamp[:19].replace('T', ' ') }}</span>
+                            <form method="POST" action="{{ url_for('admin_delete_announcement') }}" class="inline" onsubmit="return confirm('确定删除此公告？')">
+                                <input type="hidden" name="hash" value="{{ ann.hash }}">
+                                <button type="submit" class="btn btn-danger btn-small">删除</button>
+                            </form>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <p class="empty-text">暂无公告</p>
+                {% endif %}
+            </div>
+        </section>
+        
         <!-- 用户统计 -->
         <section class="admin-section full-width">
             <h2>📊 用户练习统计</h2>

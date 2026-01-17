@@ -6,7 +6,12 @@
 <div class="projects-page">
     <header class="page-header">
         <h1>📚 选择练习项目</h1>
-        <a href="{{ url_for('logout') }}" class="btn btn-outline">退出</a>
+        <div class="header-actions">
+            <button onclick="showAllAnnouncements()" class="btn btn-outline" id="viewAnnouncementsBtn">
+                📢 查看公告
+            </button>
+            <a href="{{ url_for('logout') }}" class="btn btn-outline">退出</a>
+        </div>
     </header>
     
     <div class="projects-container">
@@ -103,8 +108,24 @@
     </div>
 </div>
 
+<!-- 公告模态框 -->
+<div id="announcementModal" class="modal">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 id="modalTitle">📢 系统公告</h3>
+            <button class="modal-close" onclick="closeAnnouncementModal()">&times;</button>
+        </div>
+        <div class="modal-body" id="modalBody">
+            <!-- 公告内容将通过JavaScript填充 -->
+        </div>
+        <div class="modal-footer" id="modalFooter">
+            <button class="btn btn-primary" onclick="closeAnnouncementModal()">我知道了</button>
+        </div>
+    </div>
+</div>
+
 <script>
-// 文件夹展开状态管理（使用localStorage，不增加服务器负载）
+// ==================== 文件夹展开状态管理 ====================
 const STORAGE_KEY = 'folder_collapse_state';
 
 // 加载保存的折叠状态
@@ -140,18 +161,156 @@ function toggleFolder(header) {
     saveFolderState(folderName, isCollapsed);
 }
 
-// 页面加载时恢复折叠状态
-document.addEventListener('DOMContentLoaded', function() {
-    const states = loadFolderStates();
+// ==================== 公告功能 ====================
+let currentUnreadAnnouncements = [];
+let currentAnnouncementIndex = 0;
+
+// 获取未读公告
+async function checkUnreadAnnouncements() {
+    try {
+        const response = await fetch('/api/get_unread_announcements');
+        const data = await response.json();
+        
+        if (data.success && data.announcements.length > 0) {
+            currentUnreadAnnouncements = data.announcements;
+            currentAnnouncementIndex = 0;
+            showNextUnreadAnnouncement();
+        }
+    } catch (error) {
+        console.error('获取未读公告失败:', error);
+    }
+}
+
+// 显示下一条未读公告
+function showNextUnreadAnnouncement() {
+    if (currentAnnouncementIndex < currentUnreadAnnouncements.length) {
+        const announcement = currentUnreadAnnouncements[currentAnnouncementIndex];
+        showAnnouncementModal(announcement, true);
+    }
+}
+
+// 显示公告模态框
+function showAnnouncementModal(announcement, isUnread = false) {
+    const modal = document.getElementById('announcementModal');
+    const modalBody = document.getElementById('modalBody');
+    const modalFooter = document.getElementById('modalFooter');
     
+    // 填充内容
+    modalBody.innerHTML = `
+        <div class="announcement-detail">
+            <h4 class="announcement-modal-title">${announcement.title}</h4>
+            <p class="announcement-modal-time">${announcement.timestamp.substring(0, 19).replace('T', ' ')}</p>
+            <div class="announcement-modal-content">${announcement.content.replace(/\n/g, '<br>')}</div>
+        </div>
+    `;
+    
+    // 设置按钮
+    if (isUnread) {
+        modalFooter.innerHTML = `
+            <button class="btn btn-primary" onclick="markAsReadAndNext('${announcement.hash}')">我知道了</button>
+        `;
+    } else {
+        modalFooter.innerHTML = `
+            <button class="btn btn-primary" onclick="closeAnnouncementModal()">关闭</button>
+        `;
+    }
+    
+    modal.style.display = 'block';
+}
+
+// 标记为已读并显示下一条
+async function markAsReadAndNext(hash) {
+    try {
+        await fetch('/api/mark_announcement_read', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hash: hash })
+        });
+        
+        currentAnnouncementIndex++;
+        
+        if (currentAnnouncementIndex < currentUnreadAnnouncements.length) {
+            showNextUnreadAnnouncement();
+        } else {
+            closeAnnouncementModal();
+        }
+    } catch (error) {
+        console.error('标记公告已读失败:', error);
+        closeAnnouncementModal();
+    }
+}
+
+// 关闭公告模态框
+function closeAnnouncementModal() {
+    const modal = document.getElementById('announcementModal');
+    modal.style.display = 'none';
+}
+
+// 查看所有公告
+async function showAllAnnouncements() {
+    try {
+        const response = await fetch('/api/get_all_announcements');
+        const data = await response.json();
+        
+        if (data.success) {
+            const announcements = data.announcements;
+            const modal = document.getElementById('announcementModal');
+            const modalBody = document.getElementById('modalBody');
+            const modalFooter = document.getElementById('modalFooter');
+            
+            if (announcements.length === 0) {
+                modalBody.innerHTML = '<p class="empty-text">暂无公告</p>';
+            } else {
+                let html = '<div class="all-announcements">';
+                for (const ann of announcements) {
+                    const readBadge = ann.is_read ? '<span class="read-badge">已读</span>' : '<span class="unread-badge">未读</span>';
+                    html += `
+                        <div class="announcement-detail ${ann.is_read ? 'read' : 'unread'}">
+                            <div class="announcement-modal-header">
+                                <h4 class="announcement-modal-title">${ann.title}</h4>
+                                ${readBadge}
+                            </div>
+                            <p class="announcement-modal-time">${ann.timestamp.substring(0, 19).replace('T', ' ')}</p>
+                            <div class="announcement-modal-content">${ann.content.replace(/\n/g, '<br>')}</div>
+                        </div>
+                    `;
+                }
+                html += '</div>';
+                modalBody.innerHTML = html;
+            }
+            
+            modalFooter.innerHTML = `
+                <button class="btn btn-primary" onclick="closeAnnouncementModal()">关闭</button>
+            `;
+            
+            modal.style.display = 'block';
+        }
+    } catch (error) {
+        console.error('获取公告列表失败:', error);
+    }
+}
+
+// 点击模态框外部关闭
+window.onclick = function(event) {
+    const modal = document.getElementById('announcementModal');
+    if (event.target === modal) {
+        closeAnnouncementModal();
+    }
+}
+
+// ==================== 页面加载初始化 ====================
+document.addEventListener('DOMContentLoaded', function() {
+    // 恢复文件夹折叠状态
+    const states = loadFolderStates();
     document.querySelectorAll('.folder-section').forEach(section => {
         const folderName = section.querySelector('.folder-title').textContent.trim();
-        
-        // 如果之前保存过状态，恢复它；否则默认展开
         if (states[folderName] === true) {
             section.classList.add('collapsed');
         }
     });
+    
+    // 检查未读公告
+    checkUnreadAnnouncements();
 });
 </script>
 {% endblock %}
