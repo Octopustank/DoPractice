@@ -282,6 +282,83 @@ input[type="password"]:focus {
     padding: var(--spacing-md);
 }
 
+.projects-container {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-lg);
+}
+
+/* 文件夹部分 */
+.folder-section {
+    background: var(--card-bg);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+    transition: all 0.3s ease;
+}
+
+.folder-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: var(--spacing-lg);
+    cursor: pointer;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    transition: all 0.3s ease;
+}
+
+.folder-header:hover {
+    background: linear-gradient(135deg, #5568d3 0%, #6a4190 100%);
+}
+
+.folder-info {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+}
+
+.folder-icon {
+    font-size: 1.5rem;
+}
+
+.folder-title {
+    font-size: 1.2rem;
+    margin: 0;
+    font-weight: 600;
+}
+
+.folder-count {
+    font-size: 0.9rem;
+    opacity: 0.9;
+}
+
+.folder-toggle {
+    font-size: 1.2rem;
+    transition: transform 0.3s ease;
+}
+
+.folder-section.collapsed .folder-toggle {
+    transform: rotate(-90deg);
+}
+
+.folder-content {
+    max-height: 5000px;
+    overflow: hidden;
+    transition: max-height 0.5s ease, padding 0.3s ease;
+    padding: var(--spacing-lg);
+}
+
+.folder-section.collapsed .folder-content {
+    max-height: 0;
+    padding: 0 var(--spacing-lg);
+}
+
+/* 独立项目区域 */
+.standalone-section {
+    margin-top: var(--spacing-md);
+}
+
 .projects-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));

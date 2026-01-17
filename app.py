@@ -63,21 +63,125 @@ def save_user_data(token, data):
     with open(filepath, 'w', encoding='utf-8') as f:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
-def get_available_projects():
-    """获取所有可用的题目项目"""
-    projects = []
-    for filename in os.listdir(DATA_DIR):
-        if filename.endswith('.json'):
-            project_name = filename[:-5]  # 去掉 .json 后缀
-            projects.append(project_name)
-    return sorted(projects)
+def chinese_number_to_int(text):
+    """将中文数字转换为阿拉伯数字，用于排序
+    支持：一、二、三...九、十、十一...十九、二十...九十九
+    """
+    # 特殊情况：导论排在最前面
+    if '导论' in text:
+        return 0
+    
+    # 提取"第X章"中的X
+    import re
+    match = re.search(r'第(.+?)章', text)
+    if not match:
+        return 999  # 无法识别的放在最后
+    
+    num_text = match.group(1)
+    
+    # 中文数字映射
+    cn_num = {
+        '一': 1, '二': 2, '三': 3, '四': 4, '五': 5,
+        '六': 6, '七': 7, '八': 8, '九': 9, '十': 10,
+        '零': 0
+    }
+    
+    # 如果直接是阿拉伯数字
+    if num_text.isdigit():
+        return int(num_text)
+    
+    # 单个字符的情况
+    if len(num_text) == 1:
+        return cn_num.get(num_text, 999)
+    
+    # "十X" 的情况（十一、十二...十九）
+    if num_text.startswith('十') and len(num_text) == 2:
+        return 10 + cn_num.get(num_text[1], 0)
+    
+    # "X十" 的情况（二十、三十...九十）
+    if num_text.endswith('十') and len(num_text) == 2:
+        return cn_num.get(num_text[0], 0) * 10
+    
+    # "X十Y" 的情况（二十一、三十五...九十九）
+    if '十' in num_text and len(num_text) == 3:
+        tens = cn_num.get(num_text[0], 0) * 10
+        ones = cn_num.get(num_text[2], 0)
+        return tens + ones
+    
+    return 999  # 无法识别的放在最后
 
-def load_project_questions(project_name):
-    """加载项目题目"""
-    filepath = os.path.join(DATA_DIR, f'{project_name}.json')
+def get_available_projects():
+    """获取所有可用的题目项目，支持文件夹结构"""
+    projects = []
+    folders = {}
+    
+    # 遍历data目录
+    for item in os.listdir(DATA_DIR):
+        item_path = os.path.join(DATA_DIR, item)
+        
+        # 如果是文件夹
+        if os.path.isdir(item_path):
+            folder_name = item
+            folder_projects = []
+            
+            # 遍历文件夹中的JSON文件
+            for filename in os.listdir(item_path):
+                if filename.endswith('.json'):
+                    file_name = filename[:-5]  # 去掉 .json 后缀
+                    # 记录格式：文件夹名+文件名
+                    project_id = folder_name + file_name
+                    folder_projects.append({
+                        'id': project_id,
+                        'display_name': file_name,
+                        'folder': folder_name,
+                        'file': filename
+                    })
+            
+            if folder_projects:
+                # 使用中文数字智能排序
+                folders[folder_name] = sorted(folder_projects, key=lambda x: chinese_number_to_int(x['display_name']))
+        
+        # 如果是JSON文件（直接在data目录下）
+        elif item.endswith('.json'):
+            project_name = item[:-5]
+            projects.append({
+                'id': project_name,
+                'display_name': project_name,
+                'folder': None,
+                'file': item
+            })
+    
+    # 返回排序后的文件夹和独立项目
+    return {
+        'folders': dict(sorted(folders.items())),
+        'standalone': sorted(projects, key=lambda x: x['display_name'])
+    }
+
+def load_project_questions(project_id):
+    """加载项目题目，支持文件夹结构
+    project_id格式：
+    - 独立文件：文件名（不含.json）
+    - 文件夹内文件：文件夹名+文件名（不含.json）
+    """
+    # 先尝试直接加载（独立文件）
+    filepath = os.path.join(DATA_DIR, f'{project_id}.json')
     if os.path.exists(filepath):
         with open(filepath, 'r', encoding='utf-8') as f:
             return json.load(f)
+    
+    # 尝试在文件夹中查找
+    for folder in os.listdir(DATA_DIR):
+        folder_path = os.path.join(DATA_DIR, folder)
+        if os.path.isdir(folder_path):
+            # 检查project_id是否以该文件夹名开头
+            if project_id.startswith(folder):
+                # 提取文件名部分
+                file_name = project_id[len(folder):] + '.json'
+                filepath = os.path.join(folder_path, file_name)
+                if os.path.exists(filepath):
+                    with open(filepath, 'r', encoding='utf-8') as f:
+                        return json.load(f)
+    
     return []
 
 def parse_question(q_text):
@@ -165,33 +269,47 @@ def logout():
 @login_required
 def projects():
     """项目选择页面"""
-    available_projects = get_available_projects()
+    project_structure = get_available_projects()
     user_data = get_user_data(session['token'])
     
     # 计算每个项目的进度
-    project_info = []
-    for project in available_projects:
-        questions = load_project_questions(project)
+    def add_progress(project):
+        project_id = project['id']
+        questions = load_project_questions(project_id)
         total = len(questions)
         
         # 获取用户在该项目的进度
-        project_data = user_data.get(project, {})
+        project_data = user_data.get(project_id, {})
         answered = len(project_data.get('answers', {}))
         correct = sum(1 for v in project_data.get('answers', {}).values() if v.get('correct'))
         
-        project_info.append({
-            'name': project,
+        return {
+            **project,
             'total': total,
             'answered': answered,
             'correct': correct
-        })
+        }
     
-    return render_template('projects.html', projects=project_info)
+    # 为文件夹中的项目添加进度
+    folders_with_progress = {}
+    for folder_name, folder_projects in project_structure['folders'].items():
+        folders_with_progress[folder_name] = [add_progress(p) for p in folder_projects]
+    
+    # 为独立项目添加进度
+    standalone_with_progress = [add_progress(p) for p in project_structure['standalone']]
+    
+    return render_template('projects.html',
+                         folders=folders_with_progress,
+                         standalone_projects=standalone_with_progress)
 
 @app.route('/practice/<project_name>/<mode>')
 @login_required
 def practice(project_name, mode):
-    """练习页面"""
+    """练习页面
+    project_name是project_id，格式：
+    - 独立文件：文件名（不含.json）
+    - 文件夹内文件：文件夹名+文件名（不含.json）
+    """
     if mode not in ['memorize', 'sequential', 'random']:
         return redirect(url_for('projects'))
     

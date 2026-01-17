@@ -9,40 +9,149 @@
         <a href="{{ url_for('logout') }}" class="btn btn-outline">退出</a>
     </header>
     
-    <div class="projects-grid">
-        {% for project in projects %}
-        <div class="project-card">
-            <h3 class="project-title">{{ project.name }}</h3>
-            <div class="project-stats">
-                <span class="stat">共 <strong>{{ project.total }}</strong> 题</span>
-                <span class="stat">已答 <strong>{{ project.answered }}</strong> 题</span>
-                <span class="stat">正确 <strong>{{ project.correct }}</strong> 题</span>
+    <div class="projects-container">
+        <!-- 文件夹中的项目 -->
+        {% for folder_name, folder_projects in folders.items() %}
+        <div class="folder-section">
+            <div class="folder-header" onclick="toggleFolder(this)">
+                <div class="folder-info">
+                    <span class="folder-icon">📁</span>
+                    <h2 class="folder-title">{{ folder_name }}</h2>
+                    <span class="folder-count">({{ folder_projects|length }} 个练习)</span>
+                </div>
+                <span class="folder-toggle">▼</span>
             </div>
             
-            {% if project.total > 0 %}
-            <div class="progress-bar">
-                <div class="progress-fill" style="width: {{ (project.answered / project.total * 100)|round(1) }}%"></div>
-            </div>
-            <span class="progress-text">{{ (project.answered / project.total * 100)|round(1) }}%</span>
-            {% endif %}
-            
-            <div class="project-actions">
-                <a href="{{ url_for('practice', project_name=project.name, mode='memorize') }}" class="btn btn-secondary">
-                    📖 背题模式
-                </a>
-                <a href="{{ url_for('practice', project_name=project.name, mode='sequential') }}" class="btn btn-primary">
-                    📝 顺序练习
-                </a>
-                <a href="{{ url_for('practice', project_name=project.name, mode='random') }}" class="btn btn-accent">
-                    🎲 随机练习
-                </a>
+            <div class="folder-content">
+                <div class="projects-grid">
+                    {% for project in folder_projects %}
+                    <div class="project-card">
+                        <h3 class="project-title">{{ project.display_name }}</h3>
+                        <div class="project-stats">
+                            <span class="stat">共 <strong>{{ project.total }}</strong> 题</span>
+                            <span class="stat">已答 <strong>{{ project.answered }}</strong> 题</span>
+                            <span class="stat">正确 <strong>{{ project.correct }}</strong> 题</span>
+                        </div>
+                        
+                        {% if project.total > 0 %}
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: {{ (project.answered / project.total * 100)|round(1) }}%"></div>
+                        </div>
+                        <span class="progress-text">{{ (project.answered / project.total * 100)|round(1) }}%</span>
+                        {% endif %}
+                        
+                        <div class="project-actions">
+                            <a href="{{ url_for('practice', project_name=project.id, mode='memorize') }}" class="btn btn-secondary">
+                                📖 背题模式
+                            </a>
+                            <a href="{{ url_for('practice', project_name=project.id, mode='sequential') }}" class="btn btn-primary">
+                                📝 顺序练习
+                            </a>
+                            <a href="{{ url_for('practice', project_name=project.id, mode='random') }}" class="btn btn-accent">
+                                🎲 随机练习
+                            </a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
             </div>
         </div>
-        {% else %}
+        {% endfor %}
+        
+        <!-- 独立项目（不在文件夹中） -->
+        {% if standalone_projects %}
+        <div class="standalone-section">
+            <div class="projects-grid">
+                {% for project in standalone_projects %}
+                <div class="project-card">
+                    <h3 class="project-title">{{ project.display_name }}</h3>
+                    <div class="project-stats">
+                        <span class="stat">共 <strong>{{ project.total }}</strong> 题</span>
+                        <span class="stat">已答 <strong>{{ project.answered }}</strong> 题</span>
+                        <span class="stat">正确 <strong>{{ project.correct }}</strong> 题</span>
+                    </div>
+                    
+                    {% if project.total > 0 %}
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: {{ (project.answered / project.total * 100)|round(1) }}%"></div>
+                    </div>
+                    <span class="progress-text">{{ (project.answered / project.total * 100)|round(1) }}%</span>
+                    {% endif %}
+                    
+                    <div class="project-actions">
+                        <a href="{{ url_for('practice', project_name=project.id, mode='memorize') }}" class="btn btn-secondary">
+                            📖 背题模式
+                        </a>
+                        <a href="{{ url_for('practice', project_name=project.id, mode='sequential') }}" class="btn btn-primary">
+                            📝 顺序练习
+                        </a>
+                        <a href="{{ url_for('practice', project_name=project.id, mode='random') }}" class="btn btn-accent">
+                            🎲 随机练习
+                        </a>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+        
+        {% if not folders and not standalone_projects %}
         <div class="empty-state">
             <p>暂无可用的练习项目</p>
         </div>
-        {% endfor %}
+        {% endif %}
     </div>
 </div>
+
+<script>
+// 文件夹展开状态管理（使用localStorage，不增加服务器负载）
+const STORAGE_KEY = 'folder_collapse_state';
+
+// 加载保存的折叠状态
+function loadFolderStates() {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        return saved ? JSON.parse(saved) : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+// 保存折叠状态
+function saveFolderState(folderName, isCollapsed) {
+    try {
+        const states = loadFolderStates();
+        states[folderName] = isCollapsed;
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(states));
+    } catch (e) {
+        console.warn('无法保存文件夹状态', e);
+    }
+}
+
+// 切换文件夹展开/折叠
+function toggleFolder(header) {
+    const section = header.parentElement;
+    const folderName = header.querySelector('.folder-title').textContent.trim();
+    
+    section.classList.toggle('collapsed');
+    const isCollapsed = section.classList.contains('collapsed');
+    
+    // 保存状态
+    saveFolderState(folderName, isCollapsed);
+}
+
+// 页面加载时恢复折叠状态
+document.addEventListener('DOMContentLoaded', function() {
+    const states = loadFolderStates();
+    
+    document.querySelectorAll('.folder-section').forEach(section => {
+        const folderName = section.querySelector('.folder-title').textContent.trim();
+        
+        // 如果之前保存过状态，恢复它；否则默认展开
+        if (states[folderName] === true) {
+            section.classList.add('collapsed');
+        }
+    });
+});
+</script>
 {% endblock %}
