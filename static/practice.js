@@ -211,10 +211,21 @@
     // 更新按钮状态
     function updateButtonStates() {
         // 上一题按钮
-        elements.prevBtn.disabled = state.currentIndex === 0;
+        if (mode === 'random') {
+            elements.prevBtn.disabled = true;  // 随机模式禁用上一题
+        } else {
+            elements.prevBtn.disabled = state.currentIndex === 0;
+        }
         
         // 下一题按钮
-        elements.nextBtn.disabled = state.currentIndex === questions.length - 1;
+        if (mode === 'random') {
+            // 随机模式：根据是否还有未答题目决定
+            const unanswered = getUnansweredIndices();
+            elements.nextBtn.disabled = unanswered.length === 0;
+        } else {
+            // 顺序/背题模式：根据题目索引决定
+            elements.nextBtn.disabled = state.currentIndex === questions.length - 1;
+        }
         
         // 提交按钮
         if (mode === 'memorize') {
@@ -308,8 +319,8 @@
     
     // 下一题
     function goNext() {
-        if (mode === 'random' && !state.isSubmitted && mode !== 'memorize') {
-            // 随机模式：提交后才能下一题，下一题从未答中随机
+        if (mode === 'random') {
+            // 随机模式：从未答题目中随机选择下一题
             const unanswered = getUnansweredIndices();
             if (unanswered.length > 0) {
                 const randomIndex = unanswered[Math.floor(Math.random() * unanswered.length)];
