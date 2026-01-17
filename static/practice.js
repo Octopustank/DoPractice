@@ -330,7 +330,17 @@
     function renderAnswerCard() {
         elements.cardGrid.innerHTML = '';
         
-        questions.forEach((_, index) => {
+        let prevIsMulti = null;
+        
+        questions.forEach((question, index) => {
+            // 检测题目类型变化，插入分隔符
+            if (prevIsMulti !== null && question.is_multi !== prevIsMulti) {
+                const separator = document.createElement('div');
+                separator.className = 'card-separator';
+                elements.cardGrid.appendChild(separator);
+            }
+            prevIsMulti = question.is_multi;
+            
             const div = document.createElement('div');
             div.className = 'card-item';
             div.textContent = index + 1;

@@ -720,6 +720,11 @@ input[type="password"]:focus {
     gap: 6px;
 }
 
+.card-separator {
+    grid-column: 1 / -1;
+    height: 8px;
+}
+
 .card-item {
     aspect-ratio: 1;
     display: flex;
