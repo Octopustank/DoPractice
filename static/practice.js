@@ -276,6 +276,8 @@
                 // 只有当前还在同一题时才重新渲染
                 if (state.currentIndex === submitIndex) {
                     renderQuestion();
+                    // 提交后移除所有按钮的焦点，防止意外按Enter触发其他按钮
+                    document.activeElement?.blur();
                 }
                 
                 renderAnswerCard();
@@ -464,14 +466,23 @@
             
             switch (e.key) {
                 case 'ArrowLeft':
+                    e.preventDefault();  // 阻止默认行为
                     goPrev();
                     break;
                 case 'ArrowRight':
+                    e.preventDefault();  // 阻止默认行为
                     goNext();
                     break;
                 case 'Enter':
+                    // 🔒 关键修复：阻止Enter键的默认行为和冒泡
+                    // 这样可以防止Enter键触发焦点按钮的点击事件
                     if (!state.isSubmitted && state.selectedOptions.length > 0) {
+                        e.preventDefault();  // 阻止默认行为（如按钮点击）
+                        e.stopPropagation();  // 阻止事件冒泡
                         submitAnswer();
+                    } else if (e.target.tagName === 'BUTTON') {
+                        // 如果焦点在按钮上且题目已提交，阻止Enter触发按钮
+                        e.preventDefault();
                     }
                     break;
                 case '1':
@@ -483,6 +494,7 @@
                 case '7':
                 case '8':
                     // 数字键选择选项
+                    e.preventDefault();  // 阻止默认行为
                     const optionIndex = parseInt(e.key) - 1;
                     const question = questions[state.currentIndex];
                     if (question && question.options[optionIndex] && !state.isSubmitted && mode !== 'memorize') {
