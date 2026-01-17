@@ -234,6 +234,11 @@
         if (state.selectedOptions.length === 0 || state.isSubmitted) return;
         
         const answer = state.selectedOptions.join('');
+        const submitIndex = state.currentIndex;  // 🔒 锁定当前题目索引
+        
+        // 🔒 立即标记为已提交，防止重复提交
+        state.isSubmitted = true;
+        updateButtonStates();  // 立即更新按钮状态
         
         try {
             const response = await fetch('/api/submit_answer', {
@@ -243,7 +248,7 @@
                 },
                 body: JSON.stringify({
                     project: projectName,
-                    index: state.currentIndex,
+                    index: submitIndex,  // 使用锁定的索引
                     answer: answer
                 })
             });
@@ -251,21 +256,30 @@
             const result = await response.json();
             
             if (result.success) {
-                // 更新本地状态
-                state.localAnswers[String(state.currentIndex)] = {
+                // 更新本地状态（使用锁定的索引）
+                state.localAnswers[String(submitIndex)] = {
                     answer: answer,
                     correct: result.correct
                 };
-                state.isSubmitted = true;
                 
-                // 重新渲染
-                renderQuestion();
+                // 只有当前还在同一题时才重新渲染
+                if (state.currentIndex === submitIndex) {
+                    renderQuestion();
+                }
+                
                 renderAnswerCard();
                 updateStats();
+            } else {
+                // 提交失败，恢复状态
+                state.isSubmitted = false;
+                updateButtonStates();
             }
         } catch (error) {
             console.error('提交答案失败:', error);
             alert('提交失败，请重试');
+            // 提交失败，恢复状态
+            state.isSubmitted = false;
+            updateButtonStates();
         }
     }
     
